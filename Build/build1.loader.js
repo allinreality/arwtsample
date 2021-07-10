@@ -1,26 +1,6 @@
 function createUnityInstance(canvas, config, onProgress) {
   onProgress = onProgress || function () {};
 
-  function errorListener(e) {
-    var error = e.type == "unhandledrejection" && typeof e.reason == "object" ? e.reason : typeof e.error == "object" ? e.error : null;
-    var message = error ? error.toString() : typeof e.message == "string" ? e.message : typeof e.reason == "string" ? e.reason : "";
-    if (error && typeof error.stack == "string")
-      message += "\n" + error.stack.substring(!error.stack.lastIndexOf(message, 0) ? message.length : 0).replace(/(^\n*|\n*$)/g, "");
-    if (!message || !Module.stackTraceRegExp || !Module.stackTraceRegExp.test(message))
-      return;
-    var filename =
-      e instanceof ErrorEvent ? e.filename :
-      error && typeof error.fileName == "string" ? error.fileName :
-      error && typeof error.sourceURL == "string" ? error.sourceURL :
-      "";
-    var lineno =
-      e instanceof ErrorEvent ? e.lineno :
-      error && typeof error.lineNumber == "number" ? error.lineNumber :
-      error && typeof error.line == "number" ? error.line :
-      0;
-    errorHandler(message, filename, lineno);
-  }
-
   var Module = {
     canvas: canvas,
     webglContextAttributes: {
@@ -67,21 +47,9 @@ function createUnityInstance(canvas, config, onProgress) {
 
   Module.streamingAssetsUrl = new URL(Module.streamingAssetsUrl, document.URL).href;
 
-  // Operate on a clone of Module.disabledCanvasEvents field so that at Quit time
-  // we will ensure we'll remove the events that we created (in case user has
-  // modified/cleared Module.disabledCanvasEvents in between)
-  var disabledCanvasEvents = Module.disabledCanvasEvents.slice();
-
-  function preventDefault(e) {
-    e.preventDefault();
-  }
-
-  disabledCanvasEvents.forEach(function (disabledCanvasEvent) {
-    canvas.addEventListener(disabledCanvasEvent, preventDefault);
+  Module.disabledCanvasEvents.forEach(function (disabledCanvasEvent) {
+    canvas.addEventListener(disabledCanvasEvent, function (e) { e.preventDefault(); });
   });
-
-  window.addEventListener("error", errorListener);
-  window.addEventListener("unhandledrejection", errorListener);
 
   var unityInstance = {
     Module: Module,
@@ -99,15 +67,6 @@ function createUnityInstance(canvas, config, onProgress) {
       return new Promise(function (resolve, reject) {
         Module.shouldQuit = true;
         Module.onQuit = resolve;
-
-        // Clear the event handlers we added above, so that the event handler
-        // functions will not hold references to this JS function scope after
-        // exit, to allow JS garbage collection to take place.
-        disabledCanvasEvents.forEach(function (disabledCanvasEvent) {
-          canvas.removeEventListener(disabledCanvasEvent, preventDefault);
-        });
-        window.removeEventListener("error", errorListener);
-        window.removeEventListener("unhandledrejection", errorListener);
       });
     },
   };
@@ -125,8 +84,6 @@ function createUnityInstance(canvas, config, onProgress) {
       ['Trident', 'Internet Explorer'],
       ['MSIE', 'Internet Explorer'],
       ['Chrome', 'Chrome'],
-      ['CriOS', 'Chrome on iOS Safari'],
-      ['FxiOS', 'Firefox on iOS Safari'],
       ['Safari', 'Safari'],
     ];
 
@@ -196,22 +153,22 @@ function createUnityInstance(canvas, config, onProgress) {
       width: screen.width,
       height: screen.height,
       userAgent: ua.trim(),
-      browser: browser || 'Unknown browser',
-      browserVersion: browserVersion || 'Unknown version',
+      browser: browser,
+      browserVersion: browserVersion,
       mobile: /Mobile|Android|iP(ad|hone)/.test(navigator.appVersion),
-      os: os || 'Unknown OS',
-      osVersion: osVersion || 'Unknown OS Version',
-      gpu: gpu || 'Unknown GPU',
+      os: os,
+      osVersion: osVersion,
+      gpu: gpu,
       language: navigator.userLanguage || navigator.language,
       hasWebGL: glVersion,
       hasCursorLock: !!document.body.requestPointerLock,
       hasFullscreen: !!document.body.requestFullscreen,
       hasThreads: hasThreads,
       hasWasm: hasWasm,
-      // This should be updated when we re-enable wasm threads. Previously it checked for WASM thread
-      // support with: var wasmMemory = hasWasm && hasThreads && new WebAssembly.Memory({"initial": 1, "maximum": 1, "shared": true});
-      // which caused Chrome to have a warning that SharedArrayBuffer requires cross origin isolation.
-      hasWasmThreads: false,
+      hasWasmThreads: (function() {
+        var wasmMemory = hasWasm && hasThreads && new WebAssembly.Memory({"initial": 1, "maximum": 1, "shared": true});
+        return wasmMemory && wasmMemory.buffer instanceof SharedArrayBuffer;
+      })(),
     };
   })();
 
@@ -245,12 +202,33 @@ function createUnityInstance(canvas, config, onProgress) {
     errorHandler.didShowErrorMessage = true;
   }
 
+  function errorListener(e) {
+    var error = e.type == "unhandledrejection" && typeof e.reason == "object" ? e.reason : typeof e.error == "object" ? e.error : null;
+    var message = error ? error.toString() : typeof e.message == "string" ? e.message : typeof e.reason == "string" ? e.reason : "";
+    if (error && typeof error.stack == "string")
+      message += "\n" + error.stack.substring(!error.stack.lastIndexOf(message, 0) ? message.length : 0).replace(/(^\n*|\n*$)/g, "");
+    if (!message || !Module.stackTraceRegExp || !Module.stackTraceRegExp.test(message))
+      return;
+    var filename =
+      e instanceof ErrorEvent ? e.filename :
+      error && typeof error.fileName == "string" ? error.fileName :
+      error && typeof error.sourceURL == "string" ? error.sourceURL :
+      "";
+    var lineno =
+      e instanceof ErrorEvent ? e.lineno :
+      error && typeof error.lineNumber == "number" ? error.lineNumber :
+      error && typeof error.line == "number" ? error.line :
+      0;
+    errorHandler(message, filename, lineno);
+  }
 
   Module.abortHandler = function (message) {
     errorHandler(message, "", 0);
     return true;
   };
 
+  window.addEventListener("error", errorListener);
+  window.addEventListener("unhandledrejection", errorListener);
   Error.stackTraceLimit = Math.max(Error.stackTraceLimit || 0, 50);
 
   function progressUpdate(id, e) {
@@ -326,7 +304,7 @@ function createUnityInstance(canvas, config, onProgress) {
         while (cache.queue.length) {
           var queued = cache.queue.shift();
           if (cache.database) {
-            cache.execute.apply(cache, queued.arguments);
+            cache.execute.apply(cache, queued);
           } else if (typeof queued.onerror == "function") {
             queued.onerror(new Error("operation cancelled"));
           }
@@ -382,10 +360,7 @@ function createUnityInstance(canvas, config, onProgress) {
             onerror(e);
         }
       } else if (typeof this.database == "undefined") {
-        this.queue.push({
-          arguments: arguments,
-          onerror: onerror
-        });
+        this.queue.push(arguments);
       } else if (typeof onerror == "function") {
         onerror(new Error("indexedDB access denied"));
       }
@@ -541,17 +516,8 @@ function createUnityInstance(canvas, config, onProgress) {
         var script = document.createElement("script");
         script.src = Module.frameworkUrl;
         script.onload = function () {
-          // Adding the framework.js script to DOM created a global
-          // 'unityFramework' variable that should be considered internal.
-          // Capture the variable to local scope and clear it from global
-          // scope so that JS garbage collection can take place on
-          // application quit.
-          var fw = unityFramework;
-          unityFramework = null;
-          // Also ensure this function will not hold any JS scope
-          // references to prevent JS garbage collection.
-          script.onload = null;
-          resolve(fw);
+          delete script.onload;
+          resolve(unityFramework);
         }
         document.body.appendChild(script);
         Module.deinitializers.push(function() {

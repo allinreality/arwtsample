@@ -4,8 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Unity WebGL Player | WebAR</title>
-    <meta name="description" content="allin">
+    <title>Unity WebGL Player | ARPortal</title>
+    <meta name="description" content="">
     <link rel="shortcut icon" href="TemplateData/favicon.ico">
     <link rel="stylesheet" href="TemplateData/style.css">
   </head>
@@ -24,20 +24,20 @@
         <div id="unity-webgl-logo"></div>
         <button id="entervr" value="Enter VR" disabled>VR</button>
         <button id="enterar" value="Enter AR" disabled>AR</button>
-        <div id="unity-webxr-link">By <a href="https://allinreality.com" target="_blank" title="AllinReality">AllinReality</a></div>
-        <div id="unity-build-title">WebAR</div>
+        <div id="unity-webxr-link">Using <a href="https://github.com/De-Panther/unity-webxr-export" target="_blank" title="WebXR Export">WebXR Export</a></div>
+        <div id="unity-build-title">ARPortal</div>
       </div>
     </div>
     <script>
       var buildUrl = "Build";
-      var loaderUrl = buildUrl + "/build2.loader.js";
+      var loaderUrl = buildUrl + "/WebARBuild.loader.js";
       var config = {
-        dataUrl: buildUrl + "/build2.data",
-        frameworkUrl: buildUrl + "/build2.framework.js",
-        codeUrl: buildUrl + "/build2.wasm",
+        dataUrl: buildUrl + "/WebARBuild.data.gz",
+        frameworkUrl: buildUrl + "/WebARBuild.framework.js.gz",
+        codeUrl: buildUrl + "/WebARBuild.wasm.gz",
         streamingAssetsUrl: "StreamingAssets",
-        companyName: "DefaultCompany",
-        productName: "WebAR",
+        companyName: "yuu",
+        productName: "ARPortal",
         productVersion: "0.1",
       };
 
